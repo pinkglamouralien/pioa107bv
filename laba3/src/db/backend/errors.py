@@ -1,8 +1,11 @@
-class DatabaseError(Exception):
-    """Базовая ошибка базы данных."""
+class DBError(Exception):
+    pass
 
-class DuplicateRecordError(DatabaseError):
-    """Запись уже существует."""
+class RecordNotFoundError(DBError):
+    pass
 
-class RecordNotFoundError(DatabaseError):
-    """Запись не найдена."""
+class DuplicateRecordError(DBError):
+    pass
+
+class ValidationError(DBError):
+    pass
