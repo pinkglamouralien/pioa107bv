@@ -1,8 +1,14 @@
-class DatabaseError(Exception):
+class DBError(Exception):
     pass
 
-class DuplicateRecordError(DatabaseError):
+class RecordNotFoundError(DBError):
     pass
 
-class RecordNotFoundError(DatabaseError):
+class DuplicateRecordError(DBError):
+    pass
+
+class ValidationError(DBError):
+    pass
+
+class FileStorageError(DBError):
     pass

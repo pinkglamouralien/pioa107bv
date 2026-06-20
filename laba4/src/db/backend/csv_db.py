@@ -1,83 +1,86 @@
 import csv
-from pathlib import Path
-from src.db.backend.memory import RestaurantDB, Guest, Dish, Order
-from src.db.backend.errors import DatabaseError
+import os
+from .errors import FileStorageError, ValidationError
+from .memory import Table, DishesTable, OrdersTable
 
-class CSVRestaurantDB(RestaurantDB):
+class CSVTable(Table):
+    def __init__(self, id_field, filename, fieldnames):
+        super().__init__(id_field)
+        self.filename = filename
+        self.fieldnames = fieldnames
+        self._load()
 
-    def __init__(self, data_dir: str = "data"):
-        super().__init__()
-        self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        
-        self.guests_file = self.data_dir / "guests.csv"
-        self.dishes_file = self.data_dir / "dishes.csv"
-        self.orders_file = self.data_dir / "orders.csv"
-        
-        self._load_data()
-
-    def _load_data(self):
+    def _load(self):
+        if not os.path.exists(self.filename):
+            self._save()
+            return
         try:
-            if self.guests_file.exists():
-                with open(self.guests_file, "r", encoding="utf-8", newline="") as f:
-                    self.guests = [Guest(int(row["guest_id"]), row["name"], row["phone"]) for row in csv.DictReader(f)]
+            with open(self.filename, 'r', encoding='utf-8', newline='') as f:
+                reader = csv.DictReader(f)
+                self.records = []
+                for row in reader:
+                    converted_row = {}
+                    for k, v in row.items():
+                        if v.isdigit():
+                            converted_row[k] = int(v)
+                        else:
+                            try:
+                                converted_row[k] = float(v)
+                            except ValueError:
+                                converted_row[k] = v
+                    self.records.append(converted_row)
+        except OSError as e:
+            raise FileStorageError(f"Ошибка чтения CSV {self.filename}: {e}")
 
-            if self.dishes_file.exists():
-                with open(self.dishes_file, "r", encoding="utf-8", newline="") as f:
-                    self.dishes = [Dish(int(row["dish_id"]), row["name"], float(row["price"])) for row in csv.DictReader(f)]
+    def _save(self):
+        try:
+            os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+            with open(self.filename, 'w', encoding='utf-8', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=self.fieldnames)
+                writer.writeheader()
+                writer.writerows(self.records)
+        except OSError as e:
+            raise FileStorageError(f"Ошибка сохранения CSV {self.filename}: {e}")
 
-            if self.orders_file.exists():
-                with open(self.orders_file, "r", encoding="utf-8", newline="") as f:
-                    self.orders = [Order(int(row["order_id"]), int(row["guest_id"]), int(row["dish_id"]), int(row["quantity"])) for row in csv.DictReader(f)]
-        except Exception as e:
-            raise DatabaseError(f"Ошибка чтения CSV-файлов: {e}")
+    def create(self, record):
+        super().create(record)
+        self._save()
 
-    def _save_data(self):
-        with open(self.guests_file, "w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["guest_id", "name", "phone"])
-            writer.writeheader()
-            for g in self.guests:
-                writer.writerow({"guest_id": g.id, "name": g.name, "phone": g.phone})
+    def update(self, id_value, **updated_fields):
+        super().update(id_value, **updated_fields)
+        self._save()
 
-        with open(self.dishes_file, "w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["dish_id", "name", "price"])
-            writer.writeheader()
-            for d in self.dishes:
-                writer.writerow({"dish_id": d.id, "name": d.name, "price": d.price})
+    def delete(self, id_value):
+        super().delete(id_value)
+        self._save()
 
-        with open(self.orders_file, "w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["order_id", "guest_id", "dish_id", "quantity"])
-            writer.writeheader()
-            for o in self.orders:
-                writer.writerow({"order_id": o.id, "guest_id": o.guest_id, "dish_id": o.dish_id, "quantity": o.quantity})
+class CSVDishesTable(CSVTable):
+    def create(self, record):
+        if record.get("price", 0) < 0:
+            raise ValidationError("Цена не может быть отрицательной.")
+        super().create(record)
 
-    def create_guest(self, guest_id: int, name: str, phone: str):
-        guest = super().create_guest(guest_id, name, phone)
-        self._save_data()
-        return guest
+    def update(self, id_value, **updated_fields):
+        if "price" in updated_fields and updated_fields["price"] < 0:
+            raise ValidationError("Цена не может быть отрицательной.")
+        super().update(id_value, **updated_fields)
 
-    def update_guest(self, guest_id: int, name: str, phone: str):
-        super().update_guest(guest_id, name, phone)
-        self._save_data()
+class CSVOrdersTable(CSVTable):
+    def __init__(self, id_field, filename, fieldnames, guests_table, dishes_table):
+        super().__init__(id_field, filename, fieldnames)
+        self.guests = guests_table
+        self.dishes = dishes_table
 
-    def delete_guest(self, guest_id: int):
-        super().delete_guest(guest_id)
-        self._save_data()
+    def create(self, record):
+        if record.get("quantity", 0) <= 0:
+            raise ValidationError("Количество должно быть больше нуля.")
+        if not self.guests.read(guest_id=record.get("guest_id")):
+            raise ValidationError("Гость не найден.")
+        if not self.dishes.read(dish_id=record.get("dish_id")):
+            raise ValidationError("Блюдо не найдено.")
+        super().create(record)
 
-    def create_dish(self, dish_id: int, name: str, price: float):
-        dish = super().create_dish(dish_id, name, price)
-        self._save_data()
-        return dish
-
-    def delete_dish(self, dish_id: int):
-        super().delete_dish(dish_id)
-        self._save_data()
-
-    def create_order(self, order_id: int, guest_id: int, dish_id: int, quantity: int):
-        order = super().create_order(order_id, guest_id, dish_id, quantity)
-        self._save_data()
-        return order
-
-    def delete_order(self, order_id: int):
-        super().delete_order(order_id)
-        self._save_data()
+    def update(self, id_value, **updated_fields):
+        if "quantity" in updated_fields and updated_fields["quantity"] <= 0:
+            raise ValidationError("Количество должно быть больше нуля.")
+        super().update(id_value, **updated_fields)
