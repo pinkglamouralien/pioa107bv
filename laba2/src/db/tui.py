@@ -1,11 +1,10 @@
-from db.backend.memory import *
+from db.backend.memory import Guests, Dishes, Orders
 
 def run():
-
     while True:
         print("\n===== БАЗА ДАННЫХ РЕСТОРАНА =====")
         print("1. Добавить гостя")
-        print("2. Показать гостей")
+        print("2. Показать гостей (с фильтрацией)")
         print("3. Добавить блюдо")
         print("4. Показать блюда")
         print("5. Добавить заказ")
@@ -18,68 +17,60 @@ def run():
 
         try:
             if choice == "1":
-                create_guest(
-                    int(input("ID: ")),
-                    input("Имя: "),
-                    input("Телефон: ")
-                )
-
+                Guests.create({
+                    "guest_id": int(input("ID: ")),
+                    "name": input("Имя: "),
+                    "phone": input("Телефон: ")
+                })
                 print("Гость добавлен.")
 
             elif choice == "2":
-                name = input(
-                    "Имя для поиска (Enter - все): "
-                )
-
-                if name:
-                    guests = read_guests(name)
-                else:
-                    guests = read_guests()
-
-                for guest in guests:
+                print("Оставьте поле пустым, если фильтр не нужен.")
+                name = input("Имя для фильтра: ")
+                phone = input("Телефон для фильтра: ")
+                
+                filters = {}
+                if name: filters["name"] = name
+                if phone: filters["phone"] = phone
+                
+                for guest in Guests.read(**filters):
                     print(guest)
 
             elif choice == "3":
-                create_dish(
-                    int(input("ID: ")),
-                    input("Название: "),
-                    float(input("Цена: "))
-                )
-
+                Dishes.create({
+                    "dish_id": int(input("ID: ")),
+                    "name": input("Название: "),
+                    "price": float(input("Цена: "))
+                })
                 print("Блюдо добавлено.")
 
             elif choice == "4":
-                for dish in read_dishes():
+                for dish in Dishes.read():
                     print(dish)
 
             elif choice == "5":
-                create_order(
-                    int(input("ID заказа: ")),
-                    int(input("ID гостя: ")),
-                    int(input("ID блюда: ")),
-                    int(input("Количество: "))
-                )
-
+                Orders.create({
+                    "order_id": int(input("ID заказа: ")),
+                    "guest_id": int(input("ID гостя: ")),
+                    "dish_id": int(input("ID блюда: ")),
+                    "quantity": int(input("Количество: "))
+                })
                 print("Заказ добавлен.")
 
             elif choice == "6":
-                for order in read_orders():
+                for order in Orders.read():
                     print(order)
 
             elif choice == "7":
-                update_guest(
+                Guests.update(
                     int(input("ID гостя: ")),
-                    input("Новое имя: "),
-                    input("Новый телефон: ")
+                    name=input("Новое имя: "),
+                    phone=input("Новый телефон: ")
                 )
-
                 print("Гость обновлён.")
 
             elif choice == "8":
-                delete_guest(
-                    int(input("ID гостя: "))
-                )
-
+                Guests.delete(int(input("ID гостя: ")))
                 print("Гость удалён.")
 
             elif choice == "0":

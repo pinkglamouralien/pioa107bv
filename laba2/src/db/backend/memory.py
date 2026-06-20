@@ -1,192 +1,58 @@
-type GuestRecord = tuple[int, str, str]
+class Table:
+    def __init__(self, id):
+        self.id = id
+        self.records = []
 
-Guests : list[GuestRecord] = []
+    def create(self, record):
+        if any(r[self.id] == record[self.id] for r in self.records):
+            raise ValueError("Запись с таким ID уже существует.")
+        self.records.append(record)
 
-type DishRecord = tuple[int, str, float]
+    def read(self, **filters):
+        return [record for record in self.records if all(str(record.get(k)).lower() == str(v).lower() for k, v in filters.items())]
 
-Dishes : list[DishRecord] = []
+    def update(self, id_value, **updated_fields):
+        for record in self.records:
+            if record[self.id] == id_value:
+                record.update(updated_fields)
+                return
+        raise ValueError("Запись не найдена.")
 
-type OrderRecord = tuple[int, int, int, int]
-
-Orders : list[OrderRecord] = []
-
-def create_guest (
-    guest_id : int,
-    name : str,
-    phone: str
-) -> GuestRecord:
-    
-    if any(record[0] == guest_id for record in Guests):
-        raise ValueError(
-            f"Гость с id={guest_id} уже существует"
-        )
-    
-    new_record: GuestRecord = (
-        guest_id,
-        name.strip(),
-        phone.strip()
-    )
-
-    Guests.append(new_record)
-
-    return new_record
-
-def read_guests (name: str | None = None):
-
-    if name is None:
-        return Guests
-    
-    return [guest for guest in Guests if guest[1].lower() == name.lower()]
-
-def update_guest(
-    guest_id: int,
-    new_name: str, 
-    new_phone: str
-):
-    
-    for index, guest in enumerate(Guests):
-        if guest[0] == guest_id:
-            Guests[index] = (
-                guest_id,
-                new_name.strip(),
-                new_phone.strip()
-            )
-
-            return
-
-    raise ValueError("Гость не найден.")
-
-def delete_guest(guest_id: int):
-
-    for guest in Guests:
-        if guest[0] == guest_id:
-            Guests.remove(guest)
-            return
-    
-    raise ValueError("Гость не найден.")
-
-def create_dish(
-    dish_id: int,
-    name: str,
-    price: float
-) -> DishRecord:
-    
-    if price < 0:
-        raise ValueError(
-            "Цена не может быть отрицательной."
-        )
-    
-    if any(record[0] == dish_id for record in Dishes):
-        raise ValueError(
-            f"Блюдо c id={dish_id} уже существует."
-        )
-
-    new_record: DishRecord = (
-        dish_id,
-        name.strip(),
-        price
-    )
-
-    Dishes.append(new_record)
-
-    return new_record
-
-def read_dishes():
-
-    return Dishes
-
-def update_dishes(
-    dish_id: int,
-    new_name: str,
-    new_price: float      
-):
-
-    for index, dish in enumerate(Dishes):
-        if dish[0] == dish_id:
-            Dishes[index] = (
-                dish_id,
-                new_name.strip(),
-                new_price
-            )
-
-            return
-        
-    raise ValueError("Блюдо не найдено.")
-
-def delete_dish(dish_id: int):
-
-    for dish in Dishes:
-        if dish[0] == dish_id:
-            Dishes.remove(dish)
-
-            return
-
-    raise ValueError("Блюдо не найдено.")
-
-def create_order(
-    order_id: int,
-    guest_id: int,
-    dish_id: int,
-    quantity: int
-) -> OrderRecord:
-
-    if quantity <= 0:
-        raise ValueError(
-            "Количество должно быть больше нуля."
-        )
-
-    if any(record[0] == order_id for record in Orders):
-        raise ValueError(
-            f"Заказ с id={order_id} уже существует."
-        )
-
-    if not any(record[0] == guest_id for record in Guests):
-        raise ValueError("Гость не найден.")
-
-    if not any(record[0] == dish_id for record in Dishes):
-        raise ValueError("Блюдо не найдено.")
-
-    new_record: OrderRecord = (
-        order_id,
-        guest_id,
-        dish_id,
-        quantity
-    )
-
-    Orders.append(new_record)
-
-    return new_record
+    def delete(self, id_value):
+        for record in self.records:
+            if record[self.id] == id_value:
+                self.records.remove(record)
+                return
+        raise ValueError("Запись не найдена.")
 
 
-def read_orders():
+class DishesTable(Table):
+    def create(self, record):
+        if record.get("price", 0) < 0:
+            raise ValueError("Цена не может быть отрицательной.")
+        super().create(record)
 
-    return Orders
-
-
-def update_order(
-    order_id: int,
-    quantity: int
-):
-
-    for index, order in enumerate(Orders):
-        if order[0] == order_id:
-            Orders[index] = (
-                order[0],
-                order[1],
-                order[2],
-                quantity
-            )
-
-            return
-
-    raise ValueError("Заказ не найден.")
+    def update(self, id_value, **updated_fields):
+        if "price" in updated_fields and updated_fields["price"] < 0:
+            raise ValueError("Цена не может быть отрицательной.")
+        super().update(id_value, **updated_fields)
 
 
-def delete_order(order_id: int):
+class OrdersTable(Table):
+    def create(self, record):
+        if record.get("quantity", 0) <= 0:
+            raise ValueError("Количество должно быть больше нуля.")
+        if not Guests.read(guest_id=record.get("guest_id")):
+            raise ValueError("Гость не найден.")
+        if not Dishes.read(dish_id=record.get("dish_id")):
+            raise ValueError("Блюдо не найдено.")
+        super().create(record)
 
-    for order in Orders:
-        if order[0] == order_id:
-            Orders.remove(order)
-            return
+    def update(self, id_value, **updated_fields):
+        if "quantity" in updated_fields and updated_fields["quantity"] <= 0:
+            raise ValueError("Количество должно быть больше нуля.")
+        super().update(id_value, **updated_fields)
 
-    raise ValueError("Заказ не найден.")
+Guests = Table("guest_id")
+Dishes = DishesTable("dish_id")
+Orders = OrdersTable("order_id")
