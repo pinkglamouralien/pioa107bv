@@ -1,7 +1,7 @@
 import csv
 import os
 from .errors import FileStorageError, ValidationError
-from .memory import Table, DishesTable, OrdersTable
+from .memory import Table
 
 class CSVTable(Table):
     def __init__(self, id_field, filename, fieldnames):
@@ -39,6 +39,8 @@ class CSVTable(Table):
                 writer = csv.DictWriter(f, fieldnames=self.fieldnames)
                 writer.writeheader()
                 writer.writerows(self.records)
+        except ValueError as e:
+            raise ValidationError(f"Поля записи не соответствуют структуре CSV: {e}")
         except OSError as e:
             raise FileStorageError(f"Ошибка сохранения CSV {self.filename}: {e}")
 

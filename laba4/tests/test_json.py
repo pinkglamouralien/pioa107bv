@@ -27,6 +27,24 @@ class TestJSONStorage(unittest.TestCase):
             f.write("{invalid_json:")
         with self.assertRaises(FileStorageError):
             JSONTable("id", self.filepath)
+    
+    def test_invalid_json_structure(self):
+        with open(self.filepath, "w") as f:
+            json.dump([], f)
+        with self.assertRaises(FileStorageError):
+            JSONTable("id", self.filepath)
+        with open(self.filepath, "w") as f:
+            json.dump({"id_field": "id"}, f)
+        with self.assertRaises(FileStorageError):
+            JSONTable("id", self.filepath)
+        with open(self.filepath, "w") as f:
+            json.dump({"id_field": "id", "records": 123}, f)
+        with self.assertRaises(FileStorageError):
+            JSONTable("id", self.filepath)
+
+    def test_os_error_handling(self):
+        with self.assertRaises(FileStorageError):
+            JSONTable("id", self.temp_dir.name)
 
     def test_dishes_and_orders_json(self):
         dishes_file = os.path.join(self.temp_dir.name, "dishes.json")

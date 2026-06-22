@@ -6,6 +6,8 @@ class Table:
         self.records = []
 
     def create(self, record):
+        if self.id not in record:
+            raise ValidationError(f"Отсутствует обязательное поле: {self.id}")
         if any(r[self.id] == record[self.id] for r in self.records):
             raise DuplicateRecordError(f"Запись с таким ID уже существует.")
         self.records.append(record)
@@ -14,10 +16,20 @@ class Table:
         result = [record for record in self.records if all(str(record.get(k)).lower() == str(v).lower() for k, v in filters.items())]
 
         if sort_by:
-            result = sorted(result, key=lambda x: str(x.get(sort_by, "")), reverse=reverse)
+            with_field = [r for r in result if sort_by in r]
+            without_field = [r for r in result if sort_by not in r]
+            
+            with_field.sort(key=lambda x: x[sort_by], reverse=reverse)
+            result = with_field + without_field
+            
         return result
 
     def update(self, id_value, **updated_fields):
+        if self.id in updated_fields and updated_fields[self.id] != id_value:
+            new_id = updated_fields[self.id]
+            if any(r[self.id] == new_id for r in self.records):
+                raise DuplicateRecordError(f"Запись с ID {new_id} уже существует.")
+            
         for record in self.records:
             if record[self.id] == id_value:
                 record.update(updated_fields)

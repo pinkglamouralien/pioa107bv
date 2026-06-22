@@ -1,7 +1,7 @@
 import json
 import os
 from .errors import FileStorageError, ValidationError
-from .memory import Table, DishesTable, OrdersTable
+from .memory import Table
 
 class JSONTable(Table):
     def __init__(self, id_field, filename):
@@ -16,8 +16,19 @@ class JSONTable(Table):
         try:
             with open(self.filename, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+
+                if not isinstance(data, dict):
+                    raise FileStorageError(f"Файл {self.filename} имеет неверный формат (ожидался словарь).")
+                
+                if "records" not in data:
+                    raise FileStorageError(f"В файле {self.filename} отсутствует обязательный ключ 'records'.")
+                    
+                if not isinstance(data["records"], list):
+                    raise FileStorageError(f"В файле {self.filename} значение 'records' должно быть списком.")
+                
                 self.id = data.get("id_field", self.id)
                 self.records = data.get("records", [])
+                
         except json.JSONDecodeError as e:
             raise FileStorageError(f"Файл {self.filename} поврежден: {e}")
         except OSError as e:
@@ -27,6 +38,7 @@ class JSONTable(Table):
         try:
             os.makedirs(os.path.dirname(self.filename), exist_ok=True)
             with open(self.filename, 'w', encoding='utf-8') as f:
+
                 json.dump({"id_field": self.id, "records": self.records}, f, ensure_ascii=False, indent=4)
         except OSError as e:
             raise FileStorageError(f"Ошибка сохранения файла {self.filename}: {e}")
